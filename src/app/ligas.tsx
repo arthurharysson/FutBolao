@@ -18,27 +18,43 @@ const LeaguesScreen = () => {
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
-  const fetchMatches = async (leagueCode: string) => {
-    try {
-      setLoadingMap(prev => ({ ...prev, [leagueCode]: true }));
+const fetchMatches = async (leagueCode: string) => {
+  try {
+    setLoadingMap(prev => ({ ...prev, [leagueCode]: true }));
 
-      const res = await axios.get(`https://api.football-data.org/v4/competitions/${leagueCode}/matches`, {
-        headers: { 'X-Auth-Token': '877483580c33490eb7d65f8c0cb96c8d' },
-      });
-
-      const matches = res.data.matches.filter(match => {
-      const matchDate = new Date(match.utcDate).getTime();
-      const now = Date.now();
-      return matchDate >= now && matchDate <= now + 24 * 60 * 60 * 1000; 
+    const res = await axios.get(`https://api.football-data.org/v4/competitions/${leagueCode}/matches`, {
+      headers: { 'X-Auth-Token': '877483580c33490eb7d65f8c0cb96c8d' },
     });
 
-      setMatchesByLeague(prev => ({ ...prev, [leagueCode]: matches }));
-    } catch (error) {
-      console.error(`Erro ao buscar jogos da liga ${leagueCode}:`, error);
-    } finally {
-      setLoadingMap(prev => ({ ...prev, [leagueCode]: false }));
-    }
-  };
+    const now = new Date();
+    const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+    const validStatuses = ['SCHEDULED', 'TIMED', 'AVAILABLE'];
+
+    const matches = res.data.matches.filter(match => {
+      const matchDate = new Date(match.utcDate);
+      return (
+        validStatuses.includes(match.status) &&
+        matchDate >= now &&
+        matchDate <= twoDaysFromNow
+      );
+    });
+
+    console.log(`📅 ${leagueCode} - Jogos nas próximas 48h (${validStatuses.join(', ')}):`, matches.map(m => ({
+      date: m.utcDate,
+      stage: m.stage,
+      status: m.status,
+      home: m.homeTeam.name,
+      away: m.awayTeam.name
+    })));
+
+    setMatchesByLeague(prev => ({ ...prev, [leagueCode]: matches }));
+  } catch (error) {
+    console.error(`Erro ao buscar jogos da liga ${leagueCode}:`, error);
+  } finally {
+    setLoadingMap(prev => ({ ...prev, [leagueCode]: false }));
+  }
+};
 
   useEffect(() => {
     leagues.forEach(league => fetchMatches(league.code));
@@ -62,19 +78,18 @@ const LeaguesScreen = () => {
           ))}
 
           {/* Seção de Tabela dos Jogos */}
-        <View className="mt-6 w-full">
-          <Text className="text-white text-lg font-bold mb-2">Tabela de Liderança</Text>
+          <View className="mt-6 w-full">
+            <Text className="text-white text-lg font-bold mb-2">Tabela de Liderança</Text>
 
-         {leagues.map(league => (
-          <LeagueTableButton
-            key={league.code}
-            label={league.name}
-            flagUri={league.flagUri}
-            onPress={() => router.push(`/Tabelas/${league.code}`)} 
-          />
-        ))}
-      </View>
-
+            {leagues.map(league => (
+              <LeagueTableButton
+                key={league.code}
+                label={league.name}
+                flagUri={league.flagUri}
+                onPress={() => router.push(`/Tabelas/${league.code}`)} 
+              />
+            ))}
+          </View>
         </ScrollView>
       </View>
 
